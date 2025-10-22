@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arduino TFT Image Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 40px;
+        }
+        
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .upload-area {
+            border: 3px dashed #667eea;
+            border-radius: 15px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        
+        .upload-area:hover {
+            border-color: #764ba2;
+            background: #f8f9ff;
+        }
+        
+        .upload-area.dragover {
+            background: #f0f0ff;
+            border-color: #764ba2;
+        }
+        
+        input[type="file"] {
+            display: none;
+        }
+        
+        .upload-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        
+        .settings {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .setting-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        label {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #555;
+            font-size: 14px;
+        }
+        
+        input[type="text"], select {
+            padding: 10px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+        
+        input[type="text"]:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .preview-section {
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .preview-section.active {
+            display: block;
+        }
+        
+        .preview-container {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .preview-box {
+            text-align: center;
+        }
+        
+        .preview-box h3 {
+            font-size: 13px;
+            margin-bottom: 10px;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        canvas {
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            max-width: 100%;
+            cursor: pointer;
+            transition: border-color 0.3s;
+        }
+        
+        canvas:hover {
+            border-color: #667eea;
+        }
+        
+        .info {
+            background: #f8f9ff;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 13px;
+            color: #555;
+        }
+        
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+        }
+        
+        button:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        .note {
+            background: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px;
+            margin-top: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        
+        .warning {
+            background: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 Arduino TFT Image Converter</h1>
+        <p class="subtitle">Convert JPG/PNG to RGB565 .h header file for TFT displays</p>
+        
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📁</div>
+            <h3>Click or drag image here</h3>
+            <p style="color: #999; margin-top: 10px;">Supports JPG and PNG</p>
+            <input type="file" id="fileInput" accept="image/png,image/jpeg">
+        </div>
+        
+        <div class="settings">
+            <div class="setting-group">
+                <label for="arrayName">Array Name:</label>
+                <input type="text" id="arrayName" value="image_data" placeholder="e.g., logo_array">
+            </div>
+            <div class="setting-group">
+                <label for="byteOrder">Byte Order:</label>
+                <select id="byteOrder">
+                    <option value="lsb">LSB First (Low byte, High byte)</option>
+                    <option value="msb">MSB First (High byte, Low byte)</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="preview-section" id="previewSection">
+            <h3 style="margin-bottom: 15px;">Preview:</h3>
+            <div class="preview-container">
+                <div class="preview-box">
+                    <h3>Original</h3>
+                    <canvas id="originalCanvas"></canvas>
+                </div>
+                <div class="preview-box">
+                    <h3>RGB565 Preview</h3>
+                    <canvas id="previewCanvas"></canvas>
+                </div>
+            </div>
+            <div class="info" id="imageInfo"></div>
+        </div>
+        
+        <button id="convertBtn" disabled>Convert to .h File</button>
+        
+        <div class="note">
+            <strong>💡 Tip:</strong> RGB565 format is the standard 16-bit color format for most Arduino TFT displays. If colors appear wrong, try switching the byte order setting below (MSB ↔ LSB).
+        </div>
+    </div>
+
+    <script>
+        let imageData = null;
+        let img = null;
+        
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const originalCanvas = document.getElementById('originalCanvas');
+        const previewSection = document.getElementById('previewSection');
+        const convertBtn = document.getElementById('convertBtn');
+        const imageInfo = document.getElementById('imageInfo');
+        const arrayNameInput = document.getElementById('arrayName');
+        const byteOrderSelect = document.getElementById('byteOrder');
+        const previewCanvas = document.getElementById('previewCanvas');
+        
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.match('image.*')) {
+                loadImage(file);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                loadImage(file);
+            }
+        });
+        
+        function loadImage(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                img = new Image();
+                img.onload = () => {
+                    processImage();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+        
+        function processImage() {
+            const width = img.width;
+            const height = img.height;
+            
+            // Draw original
+            originalCanvas.width = width;
+            originalCanvas.height = height;
+            const origCtx = originalCanvas.getContext('2d');
+            origCtx.drawImage(img, 0, 0);
+            
+            // Get image data
+            imageData = origCtx.getImageData(0, 0, width, height);
+            
+            // Create RGB565 preview
+            previewCanvas.width = width;
+            previewCanvas.height = height;
+            const ctx = previewCanvas.getContext('2d');
+            const previewData = ctx.createImageData(width, height);
+            
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const r = imageData.data[i];
+                const g = imageData.data[i + 1];
+                const b = imageData.data[i + 2];
+                
+                // Convert to RGB565 and back to RGB888 for preview
+                const rgb565 = rgbToRgb565(r, g, b);
+                const [r565, g565, b565] = rgb565ToRgb(rgb565);
+                
+                previewData.data[i] = r565;
+                previewData.data[i + 1] = g565;
+                previewData.data[i + 2] = b565;
+                previewData.data[i + 3] = 255;
+            }
+            
+            ctx.putImageData(previewData, 0, 0);
+            
+            // Show info
+            const bytes = width * height * 2;
+            imageInfo.innerHTML = `
+                <strong>Dimensions:</strong> ${width} x ${height} pixels<br>
+                <strong>Memory required:</strong> ${bytes.toLocaleString()} bytes (${(bytes / 1024).toFixed(2)} KB)
+            `;
+            
+            previewSection.classList.add('active');
+            convertBtn.disabled = false;
+        }
+        
+        function rgbToRgb565(r, g, b) {
+            // Convert to 5-6-5 format
+            const r5 = (r >> 3) & 0x1F;
+            const g6 = (g >> 2) & 0x3F;
+            const b5 = (b >> 3) & 0x1F;
+            
+            return (r5 << 11) | (g6 << 5) | b5;
+        }
+        
+        function rgb565ToRgb(rgb565) {
+            // Extract color components
+            const r5 = ((rgb565 >> 11) & 0x1F) << 3;
+            const g6 = ((rgb565 >> 5) & 0x3F) << 2;
+            const b5 = (rgb565 & 0x1F) << 3;
+            
+            return [r5, g6, b5];
+        }
+        
+        convertBtn.addEventListener('click', () => {
+            const arrayName = arrayNameInput.value.trim() || 'image_data';
+            const byteOrder = byteOrderSelect.value;
+            const width = img.width;
+            const height = img.height;
+            
+            let headerContent = `// Generated by Arduino TFT Image Converter\n`;
+            headerContent += `// Image: ${width}x${height} pixels\n`;
+            headerContent += `// Byte Order: ${byteOrder.toUpperCase()}\n\n`;
+            headerContent += `#ifndef _${arrayName.toUpperCase()}_H_\n`;
+            headerContent += `#define _${arrayName.toUpperCase()}_H_\n\n`;
+            
+            headerContent += `const uint16_t ${arrayName}[${width * height}] PROGMEM = {\n`;
+            
+            const values = [];
+            for (let i = 0; i < imageData.data.length; i += 4) {
+                const r = imageData.data[i];
+                const g = imageData.data[i + 1];
+                const b = imageData.data[i + 2];
+                let rgb565 = rgbToRgb565(r, g, b);
+                
+                // Apply byte order
+                if (byteOrder === 'lsb') {
+                    // Swap bytes: convert 0xRRGG to 0xGGRR
+                    rgb565 = ((rgb565 & 0xFF) << 8) | ((rgb565 >> 8) & 0xFF);
+                }
+                
+                values.push(`0x${rgb565.toString(16).padStart(4, '0')}`);
+            }
+            
+            // Format in rows of 12 values
+            for (let i = 0; i < values.length; i += 12) {
+                const row = values.slice(i, i + 12);
+                headerContent += `  ${row.join(', ')}${i + 12 < values.length ? ',' : ''}\n`;
+            }
+            
+            headerContent += `};\n\n`;
+            headerContent += `#define ${arrayName.toUpperCase()}_WIDTH ${width}\n`;
+            headerContent += `#define ${arrayName.toUpperCase()}_HEIGHT ${height}\n\n`;
+            headerContent += `// Example usage:\n`;
+            headerContent += `// tft.drawRGBBitmap(x, y, ${arrayName}, ${arrayName.toUpperCase()}_WIDTH, ${arrayName.toUpperCase()}_HEIGHT);\n\n`;
+            headerContent += `#endif\n`;
+            
+            // Download file
+            const blob = new Blob([headerContent], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${arrayName}.h`;
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+</body>
+</html>
