@@ -271,6 +271,10 @@
             uploadArea.classList.remove('dragover');
             const file = e.dataTransfer.files[0];
             if (file && file.type.match('image.*')) {
+                // Auto-generate array name from filename
+                const fileName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                const sanitizedName = fileName.replace(/[^a-zA-Z0-9_]/g, '_'); // Replace invalid chars with underscore
+                arrayNameInput.value = sanitizedName || 'image_data';
                 loadImage(file);
             }
         });
@@ -278,6 +282,10 @@
         fileInput.addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (file) {
+                // Auto-generate array name from filename
+                const fileName = file.name.replace(/\.[^/.]+$/, ''); // Remove extension
+                const sanitizedName = fileName.replace(/[^a-zA-Z0-9_]/g, '_'); // Replace invalid chars with underscore
+                arrayNameInput.value = sanitizedName || 'image_data';
                 loadImage(file);
             }
         });
