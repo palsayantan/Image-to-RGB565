@@ -1,4 +1,4 @@
-# Arduino TFT Image Converter
+# Image to RGB565 Converter
 
 Convert JPG/PNG images to RGB565 `.h` header files for Arduino TFT displays.
 
