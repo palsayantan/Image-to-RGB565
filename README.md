@@ -20,3 +20,7 @@ If colors look wrong, switch the byte order setting.
 ## License
 
 MIT
+
+---
+
+*Built in association with [Claude.ai](https://claude.ai)*
