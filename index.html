@@ -78,6 +78,23 @@
             margin-bottom: 20px;
         }
         
+        .resize-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .resize-checkbox input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+        
+        .resize-checkbox label {
+            font-weight: normal;
+            margin: 0;
+        }
+        
         .setting-group {
             display: flex;
             flex-direction: column;
@@ -219,6 +236,24 @@
             </div>
         </div>
         
+        <div class="settings">
+            <div class="setting-group">
+                <label for="resizeWidth">Width:</label>
+                <input type="text" id="resizeWidth" placeholder="Original width">
+            </div>
+            <div class="setting-group">
+                <label for="resizeHeight">Height:</label>
+                <input type="text" id="resizeHeight" placeholder="Original height">
+            </div>
+        </div>
+        
+        <div style="margin-bottom: 20px;">
+            <div class="resize-checkbox">
+                <input type="checkbox" id="maintainRatio" checked>
+                <label for="maintainRatio" style="margin: 0; font-weight: normal; cursor: pointer;">Keep aspect ratio</label>
+            </div>
+        </div>
+        
         <div class="preview-section" id="previewSection">
             <h3 style="margin-bottom: 15px;">Preview:</h3>
             <div class="preview-container">
@@ -254,6 +289,12 @@
         const arrayNameInput = document.getElementById('arrayName');
         const byteOrderSelect = document.getElementById('byteOrder');
         const previewCanvas = document.getElementById('previewCanvas');
+        const resizeWidthInput = document.getElementById('resizeWidth');
+        const resizeHeightInput = document.getElementById('resizeHeight');
+        const maintainRatioCheckbox = document.getElementById('maintainRatio');
+        
+        let originalWidth = 0;
+        let originalHeight = 0;
         
         uploadArea.addEventListener('click', () => fileInput.click());
         
@@ -295,6 +336,10 @@
             reader.onload = (e) => {
                 img = new Image();
                 img.onload = () => {
+                    originalWidth = img.width;
+                    originalHeight = img.height;
+                    resizeWidthInput.value = img.width;
+                    resizeHeightInput.value = img.height;
                     processImage();
                 };
                 img.src = e.target.result;
@@ -302,18 +347,66 @@
             reader.readAsDataURL(file);
         }
         
+        // Handle resize width input
+        resizeWidthInput.addEventListener('input', () => {
+            if (maintainRatioCheckbox.checked && resizeWidthInput.value) {
+                const ratio = originalHeight / originalWidth;
+                resizeHeightInput.value = Math.round(resizeWidthInput.value * ratio);
+            }
+            if (img) processImage();
+        });
+        
+        // Handle resize height input
+        resizeHeightInput.addEventListener('input', () => {
+            if (maintainRatioCheckbox.checked && resizeHeightInput.value) {
+                const ratio = originalWidth / originalHeight;
+                resizeWidthInput.value = Math.round(resizeHeightInput.value * ratio);
+            }
+            if (img) processImage();
+        });
+        
+        // Validate numeric input
+        resizeWidthInput.addEventListener('keypress', (e) => {
+            if (!/[0-9]/.test(e.key)) e.preventDefault();
+        });
+        
+        resizeHeightInput.addEventListener('keypress', (e) => {
+            if (!/[0-9]/.test(e.key)) e.preventDefault();
+        });
+        
+        // Handle maintain ratio checkbox
+        maintainRatioCheckbox.addEventListener('change', () => {
+            if (maintainRatioCheckbox.checked && resizeWidthInput.value) {
+                const ratio = originalHeight / originalWidth;
+                resizeHeightInput.value = Math.round(resizeWidthInput.value * ratio);
+                if (img) processImage();
+            }
+        });
+        
         function processImage() {
-            const width = img.width;
-            const height = img.height;
+            // Get resize dimensions or use original
+            let width = parseInt(resizeWidthInput.value) || originalWidth;
+            let height = parseInt(resizeHeightInput.value) || originalHeight;
+            
+            // Ensure positive values
+            width = Math.max(1, width);
+            height = Math.max(1, height);
             
             // Draw original
-            originalCanvas.width = width;
-            originalCanvas.height = height;
+            originalCanvas.width = originalWidth;
+            originalCanvas.height = originalHeight;
             const origCtx = originalCanvas.getContext('2d');
             origCtx.drawImage(img, 0, 0);
             
-            // Get image data
-            imageData = origCtx.getImageData(0, 0, width, height);
+            // Create a temporary canvas for resizing
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = width;
+            tempCanvas.height = height;
+            const tempCtx = tempCanvas.getContext('2d');
+            tempCtx.drawImage(img, 0, 0, width, height);
+            
+            // Get image data from resized image
+            imageData = tempCtx.getImageData(0, 0, width, height);
             
             // Create RGB565 preview
             previewCanvas.width = width;
@@ -341,7 +434,8 @@
             // Show info
             const bytes = width * height * 2;
             imageInfo.innerHTML = `
-                <strong>Dimensions:</strong> ${width} x ${height} pixels<br>
+                <strong>Original:</strong> ${originalWidth} x ${originalHeight} pixels<br>
+                <strong>Output:</strong> ${width} x ${height} pixels<br>
                 <strong>Memory required:</strong> ${bytes.toLocaleString()} bytes (${(bytes / 1024).toFixed(2)} KB)
             `;
             
@@ -370,8 +464,8 @@
         convertBtn.addEventListener('click', () => {
             const arrayName = arrayNameInput.value.trim() || 'image_data';
             const byteOrder = byteOrderSelect.value;
-            const width = img.width;
-            const height = img.height;
+            const width = parseInt(resizeWidthInput.value) || originalWidth;
+            const height = parseInt(resizeHeightInput.value) || originalHeight;
             
             let headerContent = `// Generated by   : Image to RGB565 Converter\n`;
             headerContent += `// Generated from : https://palsayantan.github.io/Image-to-RGB565/\n`;
