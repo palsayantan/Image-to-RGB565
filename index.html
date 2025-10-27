@@ -158,6 +158,24 @@
             border-color: #667eea;
         }
         
+        canvas.transparent-bg {
+            background-image: 
+                linear-gradient(45deg, #ccc 25%, transparent 25%), 
+                linear-gradient(-45deg, #ccc 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #ccc 75%), 
+                linear-gradient(-45deg, transparent 75%, #ccc 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+        
+        canvas.white-bg {
+            background-color: white;
+        }
+        
+        canvas.black-bg {
+            background-color: black;
+        }
+        
         .info {
             background: #f8f9ff;
             padding: 15px;
@@ -247,10 +265,24 @@
             </div>
         </div>
         
-        <div style="margin-bottom: 20px;">
-            <div class="resize-checkbox">
-                <input type="checkbox" id="maintainRatio" checked>
-                <label for="maintainRatio" style="margin: 0; font-weight: normal; cursor: pointer;">Keep aspect ratio</label>
+        <div class="settings">
+            <div class="setting-group">
+                <label>Background:</label>
+                <div style="display: flex; gap: 15px; margin-top: 8px;">
+                    <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                        <input type="radio" name="bgColor" value="white" checked> White
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 5px; cursor: pointer; font-weight: normal;">
+                        <input type="radio" name="bgColor" value="black"> Black
+                    </label>
+                </div>
+            </div>
+            <div class="setting-group">
+                <label style="visibility: hidden;">Spacer</label>
+                <div class="resize-checkbox" style="margin-top: 8px;">
+                    <input type="checkbox" id="maintainRatio" checked>
+                    <label for="maintainRatio" style="margin: 0; font-weight: normal; cursor: pointer;">Keep aspect ratio</label>
+                </div>
             </div>
         </div>
         
@@ -295,6 +327,9 @@
         
         let originalWidth = 0;
         let originalHeight = 0;
+        
+        // Get background color radio buttons
+        const bgColorRadios = document.getElementsByName('bgColor');
         
         uploadArea.addEventListener('click', () => fileInput.click());
         
@@ -383,6 +418,26 @@
             }
         });
         
+        // Handle background color change
+        bgColorRadios.forEach(radio => {
+            radio.addEventListener('change', () => {
+                updateCanvasBackgrounds();
+                if (img) processImage(); // Reprocess image when background changes
+            });
+        });
+        
+        function updateCanvasBackgrounds() {
+            const selectedBg = document.querySelector('input[name="bgColor"]:checked').value;
+            
+            // Remove all background classes
+            originalCanvas.classList.remove('white-bg', 'black-bg');
+            previewCanvas.classList.remove('white-bg', 'black-bg');
+            
+            // Add selected background class
+            originalCanvas.classList.add(`${selectedBg}-bg`);
+            previewCanvas.classList.add(`${selectedBg}-bg`);
+        }
+        
         function processImage() {
             // Get resize dimensions or use original
             let width = parseInt(resizeWidthInput.value) || originalWidth;
@@ -392,20 +447,30 @@
             width = Math.max(1, width);
             height = Math.max(1, height);
             
+            // Get selected background color
+            const selectedBg = document.querySelector('input[name="bgColor"]:checked').value;
+            const bgColor = selectedBg === 'white' ? [255, 255, 255] : [0, 0, 0];
+            
             // Draw original
             originalCanvas.width = originalWidth;
             originalCanvas.height = originalHeight;
             const origCtx = originalCanvas.getContext('2d');
             origCtx.drawImage(img, 0, 0);
             
-            // Create a temporary canvas for resizing
+            // Create a temporary canvas for resizing with background
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = width;
             tempCanvas.height = height;
             const tempCtx = tempCanvas.getContext('2d');
+            
+            // Fill with selected background color
+            tempCtx.fillStyle = selectedBg;
+            tempCtx.fillRect(0, 0, width, height);
+            
+            // Draw image on top (this composites transparent pixels with background)
             tempCtx.drawImage(img, 0, 0, width, height);
             
-            // Get image data from resized image
+            // Get image data from resized image (now with background applied)
             imageData = tempCtx.getImageData(0, 0, width, height);
             
             // Create RGB565 preview
@@ -430,6 +495,9 @@
             }
             
             ctx.putImageData(previewData, 0, 0);
+            
+            // Apply background color
+            updateCanvasBackgrounds();
             
             // Show info
             const bytes = width * height * 2;
